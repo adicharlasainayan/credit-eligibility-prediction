@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: credit-eligibility-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        value: credit_risk_db
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: MODEL_PATH
+        value: model/model_package.joblib
+    healthCheckPath: /health
+    autoDeploy: true

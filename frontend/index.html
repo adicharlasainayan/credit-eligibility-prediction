@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Credit Card Eligibility Prediction | Bank Officer Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💳</text></svg>" />
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-icon">💳</span>
+      <div>
+        <span class="brand-name">SecureBank</span>
+        <span class="brand-sub">Credit Operations</span>
+      </div>
+    </div>
+    <nav class="header-nav">
+      <span class="badge-officer">🏦 Bank Officer Portal</span>
+      <span id="clock" class="clock"></span>
+    </nav>
+  </div>
+</header>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero">
+  <div class="hero-inner">
+    <h1 class="hero-title">CREDIT CARD ELIGIBILITY PREDICTION</h1>
+    <p class="hero-subtitle">
+      ML-powered decision support for credit risk assessment.<br/>
+      Enter a Customer ID to retrieve full profile and generate an eligibility recommendation.
+    </p>
+
+    <!-- Search Card -->
+    <div class="search-card">
+      <div class="search-icon">🔍</div>
+      <h2 class="search-label">Customer Eligibility Check</h2>
+      <div class="search-row">
+        <div class="input-group">
+          <label for="userId" class="sr-only">Customer User ID</label>
+          <span class="input-prefix">ID</span>
+          <input
+            type="number"
+            id="userId"
+            class="id-input"
+            placeholder="Enter Customer User ID (e.g. 20174)"
+            min="1"
+            autocomplete="off"
+          />
+        </div>
+        <button id="checkBtn" class="check-btn" onclick="checkEligibility()">
+          <span class="btn-icon">⚡</span> CHECK ELIGIBILITY
+        </button>
+      </div>
+      <p class="search-hint">Valid IDs: 1 – 30000 (from UCI Credit Card Default dataset)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ QUICK STATS ══════════════ -->
+<section class="stats-bar" id="statsBar">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <span class="stat-value" id="statCustomers">—</span>
+      <span class="stat-label">Total Customers</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value" id="statPredictions">—</span>
+      <span class="stat-label">Total Checks</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value approved-text" id="statApproved">—</span>
+      <span class="stat-label">Approved</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value rejected-text" id="statRejected">—</span>
+      <span class="stat-label">Not Approved</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ LOADER ══════════════ -->
+<div id="loader" class="loader-overlay" style="display:none;">
+  <div class="loader-box">
+    <div class="spinner"></div>
+    <p>Analyzing customer profile…</p>
+  </div>
+</div>
+
+<!-- ══════════════ ERROR BANNER ══════════════ -->
+<div id="errorBanner" class="error-banner" style="display:none;">
+  <span class="error-icon">⚠️</span>
+  <span id="errorMsg">An error occurred.</span>
+  <button onclick="dismissError()">✕</button>
+</div>
+
+<!-- ══════════════ RESULTS ══════════════ -->
+<main class="results-section" id="results" style="display:none;">
+  <div class="results-inner">
+
+    <!-- ── Row 1: Eligibility Verdict ── -->
+    <div class="verdict-card" id="verdictCard">
+      <div class="verdict-left">
+        <div class="verdict-icon" id="verdictIcon">✅</div>
+        <div>
+          <div class="verdict-status" id="verdictStatus">APPROVED</div>
+          <div class="verdict-uid">Customer ID: <strong id="displayUID">—</strong></div>
+        </div>
+      </div>
+      <div class="verdict-right">
+        <div class="verdict-meta" id="verdictMeta">Default probability below threshold → Eligible for credit card</div>
+        <div class="verdict-disclaimer">
+          ℹ️ This is an ML-based recommendation, not an official bank approval decision.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 2: Three-column layout ── -->
+    <div class="grid-3">
+
+      <!-- ── Col 1: Customer Details ── -->
+      <div class="card customer-card">
+        <div class="card-header">
+          <span class="card-icon">👤</span>
+          <h3>Customer Profile</h3>
+        </div>
+        <div class="detail-list" id="customerDetails">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- ── Col 2: Credit Health Score ── -->
+      <div class="card score-card">
+        <div class="card-header">
+          <span class="card-icon">📊</span>
+          <h3>Estimated Credit Health Score</h3>
+        </div>
+        <div class="score-body">
+          <div class="score-circle-wrapper">
+            <svg class="score-ring" viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="50"
+                      stroke-dasharray="314" stroke-dashoffset="314"/>
+            </svg>
+            <div class="score-center">
+              <span class="score-number" id="scoreNumber">—</span>
+              <span class="score-denom">/100</span>
+            </div>
+          </div>
+          <div class="score-category" id="scoreCategory">—</div>
+          <div class="score-risk"    id="scoreRisk">—</div>
+
+          <!-- Bar -->
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+          </div>
+          <div class="progress-labels">
+            <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+          </div>
+
+          <p class="score-disclaimer">
+            ⚠️ <strong>Estimated Model-Based Credit Health Score</strong> — This is an
+            illustrative, model-derived indicator calculated as
+            <em>100 × (1 − P(default))</em>. It is <strong>NOT</strong> an official
+            credit bureau score (CIBIL / Experian / Equifax) and must not be used as one.
+          </p>
+        </div>
+      </div>
+
+      <!-- ── Col 3: Probability & Decision ── -->
+      <div class="card prob-card">
+        <div class="card-header">
+          <span class="card-icon">🎯</span>
+          <h3>ML Prediction Details</h3>
+        </div>
+        <div class="prob-body">
+          <div class="prob-row">
+            <span class="prob-label">Default Probability</span>
+            <span class="prob-value danger-text" id="defaultProb">—</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill danger-fill" id="defaultBar" style="width:0%"></div></div>
+
+          <div class="prob-row" style="margin-top:16px">
+            <span class="prob-label">No-Default Probability</span>
+            <span class="prob-value success-text" id="noDefaultProb">—</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill success-fill" id="noDefaultBar" style="width:0%"></div></div>
+
+          <hr class="divider"/>
+
+          <div class="threshold-row">
+            <span>Decision Threshold</span>
+            <span class="threshold-val" id="thresholdVal">—</span>
+          </div>
+          <div class="threshold-row">
+            <span>Model Decision</span>
+            <span class="threshold-val" id="modelDecision">—</span>
+          </div>
+
+          <hr class="divider"/>
+
+          <div class="model-info">
+            <div class="model-badge">🌲 Random Forest Classifier</div>
+            <div class="model-badge">⚖️ Cost-Sensitive Threshold (0.16)</div>
+            <div class="model-badge">📐 ROC-AUC: 0.7687</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 3: Payment History ── -->
+    <div class="card full-card">
+      <div class="card-header">
+        <span class="card-icon">📆</span>
+        <h3>Payment & Bill History (Recent 6 Months)</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="history-table" id="payHistoryTable">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Repayment Status</th>
+              <th>Bill Amount (NT\$)</th>
+              <th>Payment Made (NT\$)</th>
+            </tr>
+          </thead>
+          <tbody id="payHistoryBody">
+            <!-- filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Row 4: Prediction History ── -->
+    <div class="card full-card">
+      <div class="card-header">
+        <span class="card-icon">🕒</span>
+        <h3>Prediction History for this Customer</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="history-table" id="predHistoryTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date &amp; Time</th>
+              <th>Default Prob.</th>
+              <th>No-Default Prob.</th>
+              <th>Credit Score</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="predHistoryBody">
+            <tr><td colspan="6" class="empty-row">No previous checks found.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /results-inner -->
+</main>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p>© 2026 SecureBank Credit Operations · Powered by Random Forest ML · For internal bank officer use only.</p>
+    <p class="footer-sub">
+      Predictions are decision-support recommendations only and do not constitute binding credit approvals.
+    </p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
